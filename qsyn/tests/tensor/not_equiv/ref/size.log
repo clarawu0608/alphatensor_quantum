@@ -1,0 +1,22 @@
+qsyn> qcir qubit add
+
+qsyn> qc2ts
+
+qsyn> qcir qubit add
+
+qsyn> qc2ts
+
+qsyn> tensor list
+  0                        #Dim: 2   QC2TS
+★ 1                        #Dim: 2   QC2TS
+
+qsyn> tensor equiv 0 1 
+Not Equivalent
+- Shape Mismatch: [2, 2] vs [4, 4]
+
+qsyn> tensor equiv 0 1 --strict
+Not Equivalent
+- Shape Mismatch: [2, 2] vs [4, 4]
+
+qsyn> quit -f
+

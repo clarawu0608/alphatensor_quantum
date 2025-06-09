@@ -1,0 +1,17 @@
+qcir read benchmark/SABRE/small/3_17_13.qasm
+qcp -s
+// tableau based optimizations
+qc2tabl
+tableau print
+tableau opt tmerge
+tableau print
+tableau opt hopt
+tableau print
+tableau opt phasepoly todd
+logger off
+tableau print
+// convert back to circuit
+tabl2qc
+qcp -s
+qcir equiv 1 0
+quit -f

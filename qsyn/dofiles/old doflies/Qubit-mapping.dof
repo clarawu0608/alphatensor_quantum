@@ -1,0 +1,13 @@
+qcir read benchmark/SABRE/large/adr4_197.qasm
+qcir conf --si 1 --d 2 --sw 6
+
+device read benchmark/topology/guadalupe_16.layout
+duostra config --p naive --r duostra --scheduler search
+duostra -c
+
+map-equiv -l 0 -p 1
+qcir print --stat
+qcir list
+qcir write examples/adr4_197-opt.qasm
+
+quit -f

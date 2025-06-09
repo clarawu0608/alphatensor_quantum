@@ -1,0 +1,19 @@
+qsyn> qcir read ./benchmark/qft/qft_5.qasm
+
+qsyn> qc2zx
+
+qsyn> zx2ts
+
+qsyn> zx copy
+
+qsyn> zx optimize --partition 4
+
+qsyn> zx2ts
+
+qsyn> tensor equiv 0 1
+Equivalent
+- Global Norm : 1
+- Global Phase: 0
+
+qsyn> quit -f
+

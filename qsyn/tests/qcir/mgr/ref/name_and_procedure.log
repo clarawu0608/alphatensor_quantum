@@ -1,0 +1,22 @@
+qsyn> qcir read benchmark/SABRE/large/adr4_197.qasm
+
+qsyn> qc2zx
+
+qsyn> zx optimize --full
+
+qsyn> zx2qc
+
+qsyn> qcir optimize --copy
+
+qsyn> qcir list
+  0    adr4_197            
+  1    adr4_197            QC2ZX ➔ FR ➔ ZX2QC
+★ 2    adr4_197            QC2ZX ➔ FR ➔ ZX2QC ➔ Optimize
+
+qsyn> qcir
+-> #QCir: 3
+-> Now focused on: QCir 2 (adr4_197)
+
+qsyn> 
+qsyn> quit -f
+

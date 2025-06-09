@@ -1,0 +1,107 @@
+qsyn> qcir read benchmark/SABRE/large/cm82a_208.qasm
+
+qsyn> device read benchmark/topology/guadalupe_16.layout 
+
+qsyn> qcir print --statistics
+QCir (16 qubits, 650 gates)
+Clifford   : 370
+└── H-gate : 80 (75 internal)
+2-qubit    : 283
+T-family   : 280
+Others     : 0
+Depth      : 337
+
+qsyn> duostra config --verbose
+
+Scheduler:         search
+Router:            duostra
+Placer:            dfs
+
+# Candidates:      unlimited
+Search Depth:      4
+
+Tie breaker:       min
+APSP Coeff.:       1
+2-Qb. Avail. Time: max
+Cost Selector:     min
+Never Cache:       true
+Single Immed.:     false
+
+qsyn> duostra config --depth 2 --single-immediate true
+
+qsyn> duostra config --verbose
+
+Scheduler:         search
+Router:            duostra
+Placer:            dfs
+
+# Candidates:      unlimited
+Search Depth:      2
+
+Tie breaker:       min
+APSP Coeff.:       1
+2-Qb. Avail. Time: max
+Cost Selector:     min
+Never Cache:       true
+Single Immed.:     true
+
+qsyn> duostra --check
+Routing...
+
+Checking...
+
+Duostra Result: 
+
+Scheduler:      search
+Router:         duostra
+Placer:         dfs
+
+Mapping Depth:  1604
+Total Time:     3573
+#SWAP:          440
+
+
+qsyn> qcir print --statistics
+QCir (16 qubits, 1970 gates)
+Clifford   : 1690
+└── H-gate : 80 (76 internal)
+2-qubit    : 1603
+T-family   : 280
+Others     : 0
+Depth      : 884
+
+qsyn> duostra config --scheduler greedy
+
+qsyn> duostra config
+
+Scheduler:         greedy
+Router:            duostra
+Placer:            dfs
+
+qsyn> duostra --check
+Routing...
+
+Checking...
+
+Duostra Result: 
+
+Scheduler:      greedy
+Router:         duostra
+Placer:         dfs
+
+Mapping Depth:  1953
+Total Time:     4899
+#SWAP:          221
+
+
+qsyn> qcir print --statistics
+QCir (16 qubits, 2633 gates)
+Clifford   : 2353
+└── H-gate : 80 (76 internal)
+2-qubit    : 2266
+T-family   : 280
+Others     : 0
+Depth      : 1053
+
+qsyn> quit -f
+

@@ -1,0 +1,67 @@
+qsyn> alias exit quit
+
+qsyn> exi -h
+Usage: quit [-h] [-f]
+
+Description:
+  quit qsyn
+
+Options:
+  flag  -h, --help     show this help message   
+  flag  -f, --force    quit without reaffirming 
+
+qsyn> alias exir "qcir read"
+
+qsyn> exi -h
+[error]    Ambiguous command or alias `exi`!!
+
+qsyn> exir -h
+Usage: qcir read [-h] [-r] <string filepath>
+
+Description:
+  read a circuit and construct the corresponding netlist
+
+Positional Arguments:
+  string  filepath    the filepath to quantum circuit file. Supported extension: .qasm, .qc 
+
+Options:
+  flag  -h, --help       show this help message                                                  
+  flag  -r, --replace    if specified, replace the current circuit; otherwise store to a new one 
+
+qsyn> exit -h
+Usage: quit [-h] [-f]
+
+Description:
+  quit qsyn
+
+Options:
+  flag  -h, --help     show this help message   
+  flag  -f, --force    quit without reaffirming 
+
+qsyn> alias -d exir
+
+qsyn> exit -h
+Usage: quit [-h] [-f]
+
+Description:
+  quit qsyn
+
+Options:
+  flag  -h, --help     show this help message   
+  flag  -f, --force    quit without reaffirming 
+
+qsyn> exir -h
+[error]    Unknown command!! (exir)
+
+qsyn> exi -h
+Usage: quit [-h] [-f]
+
+Description:
+  quit qsyn
+
+Options:
+  flag  -h, --help     show this help message   
+  flag  -f, --force    quit without reaffirming 
+
+qsyn> exit -f
+

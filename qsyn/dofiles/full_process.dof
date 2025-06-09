@@ -1,0 +1,71 @@
+// sk-algorithm
+tensor read ./rand.csv
+sk-decompose -d 3 -r 3
+qcp --stat
+
+// boolean oracle
+qcir oracle -h
+
+// logical synthesis
+// qcir
+qcir read benchmark/SABRE/small/3_17_13.qasm 
+qcir print
+qcir print -stat
+
+qcir list
+qc checkout 0
+qcir list
+qc checkout 1
+
+// tensor
+convert qcir tensor
+tensor print
+
+// tableau
+convert qcir tableau
+tableau print
+tableau print -b
+
+tableau optimize -h
+tableau optimize full
+
+convert tableau qcir -h
+// convert tableau qcir -r -h
+convert tableau qcir -r graysynth
+
+qcir list
+qcir checkout 1
+
+// zx
+convert qcir zx 
+zx print
+zx print -s 
+
+zx optimize -h
+zx rule -h
+zx optimize -full
+zx print
+convert zx qcir
+qc print
+qc optimize
+qc print
+qc list
+
+// check eq
+qc equiv 1 3
+
+convert qcir tensor
+ts list
+ts eq 1 2
+
+qc2zx
+zx list
+zx adj
+zx compose 0
+zx optimize
+zx test -i
+
+//logger -h
+
+quit -f
+

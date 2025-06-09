@@ -1,0 +1,21 @@
+qsyn> zx read benchmark/zx/tof2_opt.zx
+
+qsyn> zx gflow --all --only-xy-plane
+GFlow of the graph:
+Level 0
+   1 (XY): (None)
+   3 (XY): (None)
+   5 (XY): (None)
+Level 1
+   6 (XY): 1
+  11 (XY): 3
+  18 (XY): 5
+Level 2
+  17 (XY): 18
+No GFlow exists.
+The flow breaks at level 3.
+No correction sets found for the following vertices:
+0 8 9 13 2 14 16
+
+qsyn> quit -f 
+

@@ -1,0 +1,8 @@
+# sk-algorithm
+tensor read rand.csv
+sk-decompose -d 3 -r 3
+qcp --stat
+
+# boolean oracle
+qcir oracle 0110
+qcp -d
