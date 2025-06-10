@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <string>
 #include <algorithm>
+#include <regex>
 
 #include "../tableau_optimization.hpp"
 #include "tableau/pauli_rotation.hpp"
@@ -386,39 +387,29 @@ std::pair<StabilizerTableau, Polynomial> ToddPhasePolynomialOptimizationStrategy
         if (!file.is_open()) {
             spdlog::error("Failed to open polynomial-before-todd.txt for writing.");
         } else {
-            for (auto const& rotation : ret_polynomial) {
-                auto const& pauli_prod = rotation.pauli_product();
-                file << "[";
+            file << "[\n";
+            for (size_t idx = 0; idx < ret_polynomial.size(); ++idx) {
+                auto const& rotation = ret_polynomial[idx];
+                auto const& pauli_str = fmt::format("{}", rotation);  // e.g., exp(i * π/4 * ZIZ)
 
-                // for (int i = static_cast<int>(rotation.n_qubits()) - 1; i >= 0; --i) {
-                for (int i = 0; i < static_cast<int>(rotation.n_qubits()); i++) {
-                    // if (pauli_prod.is_x_set(i) && pauli_prod.is_z_set(i)) {
-                    //     file << "Y";
-                    // } else if (pauli_prod.is_x_set(i)) {
-                    //     file << "X";
-                    // } else if (pauli_prod.is_z_set(i)) {
-                    //     file << "Z";
-                    // } else {
-                    //     file << "I";
-                    // }
-                    if (pauli_prod.is_y(i)) {
-                        file << "Y";
-                    } else if (pauli_prod.is_x(i)) {
-                        file << "X";
-                    } else if (pauli_prod.is_z(i)) {
-                        file << "Z";
-                    } else {
-                        file << "I";
-                    }
-
-                    if (i + 1 != rotation.n_qubits()) file << ", ";
+                std::string bit_array = "[";
+                for (char c : pauli_str | std::views::reverse) {  // Pauli string is at the end
+                    if (c == 'Z') bit_array += "1, ";
+                    else if (c == 'I') bit_array += "0, ";
                 }
 
-                auto const& phase = rotation.phase();
-                file << "] * " << phase.numerator() << "/" << phase.denominator() << "\n";
+                // Remove trailing comma and space
+                if (bit_array.size() > 1) bit_array.pop_back(), bit_array.pop_back();
+                bit_array += "]";
+
+                file << "  " << bit_array;
+                if (idx + 1 != ret_polynomial.size()) file << ",";
+                file << "\n";
             }
+            file << "]\n";
         }
     }
+
 
 
     spdlog::trace("Polynomial before TODD:\n{}", fmt::join(ret_polynomial, "\n"));
@@ -427,15 +418,44 @@ std::pair<StabilizerTableau, Polynomial> ToddPhasePolynomialOptimizationStrategy
     for (auto const& r : ret_polynomial)
         spdlog::debug("[BEFORE] {}", r);
 
-    // while (true) {
-    //     auto const num_terms = ret_polynomial.size();
-    //     ret_polynomial       = todd_once(ret_polynomial);
-    //     if (ret_polynomial.empty() || ret_polynomial.size() == num_terms) {
-    //         break;
-    //     }
-    //     spdlog::trace("Polynomial after TODD:\n{}", fmt::join(ret_polynomial, "\n"));
-    //     spdlog::debug("num_terms after TODD: {}", ret_polynomial.size());
-    // }    
+    while (true) {
+        auto const num_terms = ret_polynomial.size();
+        ret_polynomial       = todd_once(ret_polynomial);
+        if (ret_polynomial.empty() || ret_polynomial.size() == num_terms) {
+            break;
+        }
+        spdlog::trace("Polynomial after TODD:\n{}", fmt::join(ret_polynomial, "\n"));
+        spdlog::debug("num_terms after TODD: {}", ret_polynomial.size());
+    }
+    
+    {
+        std::ofstream file("./outputs/polynomial-after-todd.txt", std::ios::trunc);
+        if (!file.is_open()) {
+            spdlog::error("Failed to open polynomial-after-todd.txt for writing.");
+        } else {
+            file << "[\n";
+            for (size_t idx = 0; idx < ret_polynomial.size(); ++idx) {
+                auto const& rotation = ret_polynomial[idx];
+                auto const& pauli_str = fmt::format("{}", rotation);  // e.g., exp(i * π/4 * ZIZ)
+
+                std::string bit_array = "[";
+                for (char c : pauli_str | std::views::reverse) {  // Pauli string is at the end
+                    if (c == 'Z') bit_array += "1, ";
+                    else if (c == 'I') bit_array += "0, ";
+                }
+
+                // Remove trailing comma and space
+                if (bit_array.size() > 1) bit_array.pop_back(), bit_array.pop_back();
+                bit_array += "]";
+
+                file << "  " << bit_array;
+                if (idx + 1 != ret_polynomial.size()) file << ",";
+                file << "\n";
+            }
+            file << "]\n";
+        }
+    }
+
 
     {
         std::ifstream file("./outputs/polynomial-after-todd.txt");
@@ -446,48 +466,33 @@ std::pair<StabilizerTableau, Polynomial> ToddPhasePolynomialOptimizationStrategy
             std::string line;
 
             while (std::getline(file, line)) {
-                // Expected format: [Z, I, Z] * 1/4
-                size_t left_bracket = line.find('[');
-                size_t right_bracket = line.find(']');
-                size_t star_pos = line.find('*');
-
-                if (left_bracket == std::string::npos || right_bracket == std::string::npos || star_pos == std::string::npos) {
-                    spdlog::error("Malformed line in polynomial-after-todd.txt: {}", line);
+                // Skip non-array lines
+                if (line.find('[') == std::string::npos || line.find(']') == std::string::npos)
                     continue;
-                }
-
-                std::string pauli_str = line.substr(left_bracket + 1, right_bracket - left_bracket - 1);
-                std::string phase_str = line.substr(star_pos + 1);
-                phase_str.erase(0, phase_str.find_first_not_of(" \t"));
-                std::istringstream pauli_stream(pauli_str);
-                std::string token;
 
                 std::vector<Pauli> paulis;
-                while (std::getline(pauli_stream, token, ',')) {
-                    token.erase(std::remove_if(token.begin(), token.end(), ::isspace), token.end());
-                    if (token == "I") paulis.push_back(Pauli::i);
-                    else if (token == "X") paulis.push_back(Pauli::x);
-                    else if (token == "Y") paulis.push_back(Pauli::y);
-                    else if (token == "Z") paulis.push_back(Pauli::z);
-                    else spdlog::warn("Unknown Pauli token '{}'", token);
+                std::istringstream bits(line);
+                char c;
+
+                while (bits >> c) {
+                    if (c == '0') paulis.push_back(Pauli::i);
+                    else if (c == '1') paulis.push_back(Pauli::z);
+                    // ignore [, ], commas
                 }
 
-                // Parse phase
-                int num = 0, denom = 1;
-                std::istringstream phase_stream(phase_str);
-                char slash;
-                phase_stream >> num >> slash >> denom;
-                // spdlog::debug("Parsed phase: {} / {}", num, denom);
+                // reverse to restore LSB→MSB if needed
+                std::reverse(paulis.begin(), paulis.end());
 
-                dvlab::Phase phase(num, denom);
+                dvlab::Phase phase(1, 4);  // always π/4
                 override_poly.emplace_back(paulis, phase);
             }
 
             if (!override_poly.empty()) {
-                spdlog::info("Replaced optimized polynomial with {} terms from polynomial-after-todd.txt.", override_poly.size());
+                spdlog::info("Replaced polynomial with {} terms from polynomial-after-todd.txt.", override_poly.size());
                 ret_polynomial = std::move(override_poly);
+                properize(ret_clifford, ret_polynomial);
             } else {
-                spdlog::warn("No valid rotations loaded from polynomial-after-todd.txt.");
+                spdlog::warn("No valid terms loaded.");
             }
         }
     }
@@ -496,21 +501,6 @@ std::pair<StabilizerTableau, Polynomial> ToddPhasePolynomialOptimizationStrategy
     spdlog::debug("[AFTER] {}", r);
 
     multi_linear_polynomial.add_rotations(ret_polynomial, true);
-
-    auto dump_signature = [](std::string_view label, Polynomial const& poly) {
-        auto matrix = load_phase_poly_matrix(poly);
-        spdlog::debug("{} signature:", label);
-        for (size_t r = 0; r < matrix.num_rows(); ++r) {
-            std::string row_str;
-            for (size_t c = 0; c < matrix.num_cols(); ++c) {
-                row_str += matrix[r][c] ? '1' : '0';
-            }
-            spdlog::debug("  {}", row_str);
-        }
-    };
-
-    // dump_signature("Before", polynomial);
-    // dump_signature("After", ret_polynomial);
 
     if (auto clifford_ops = multi_linear_polynomial.extract_clifford_operators(); clifford_ops.has_value()) {
         ret_clifford.apply(*clifford_ops);

@@ -1,0 +1,3 @@
+qcir read benchmark/SABRE/small/3_17_13.qasm
+qc2tabl
+tableau optimize full
