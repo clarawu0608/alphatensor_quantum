@@ -62,7 +62,7 @@ class EnvironmentParams:
   target_circuit_types: Sequence[tensors.CircuitType]
   target_circuit_probabilities: Sequence[float] | None = None
 
-  max_num_moves: int = 250
+  max_num_moves: int = 5
   use_gadgets: bool = True
   num_past_factors_to_observe: int = 20
 

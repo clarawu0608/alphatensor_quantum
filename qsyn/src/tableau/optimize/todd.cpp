@@ -383,7 +383,7 @@ std::pair<StabilizerTableau, Polynomial> ToddPhasePolynomialOptimizationStrategy
     multi_linear_polynomial.add_rotations(ret_polynomial, false);
 
     {
-        std::ofstream file("./outputs/polynomial-before-todd.txt", std::ios::trunc);
+        std::ofstream file("./outputs/before/polynomial-before-todd.txt", std::ios::trunc);
         if (!file.is_open()) {
             spdlog::error("Failed to open polynomial-before-todd.txt for writing.");
         } else {
@@ -429,7 +429,7 @@ std::pair<StabilizerTableau, Polynomial> ToddPhasePolynomialOptimizationStrategy
     }
     
     {
-        std::ofstream file("./outputs/polynomial-after-todd.txt", std::ios::trunc);
+        std::ofstream file("./outputs/after/polynomial-after-todd.txt", std::ios::trunc);
         if (!file.is_open()) {
             spdlog::error("Failed to open polynomial-after-todd.txt for writing.");
         } else {

@@ -71,6 +71,8 @@ class RunState(NamedTuple):
   opt_state: optax.OptState
   game_stats: GameStats
   rng: chex.PRNGKey
+  actions: jt.Integer[jt.Scalar, '']
+  demonstrations_actions: jt.Integer[jt.Scalar, '']
 
 
 class NeuralNetwork(hk.Module):
@@ -218,6 +220,12 @@ class Agent:
         opt_state=self._opt.init(params),
         game_stats=game_stats,
         rng=rng_run_state,
+        actions= jnp.zeros(
+            (self._config.exp_config.batch_size,), dtype=jnp.int32
+        ),
+        demonstrations_actions=jnp.zeros(
+            (self._config.exp_config.batch_size,), dtype=jnp.int32
+        ),
     )
 
   def _recurrent_fn(
@@ -497,6 +505,13 @@ class Agent:
     new_env_states = self._env.step(actions, run_state.env_states)
     is_terminal = new_env_states.is_terminal
 
+    # # Log or save completed circuits
+    # trained_circuits = self._extract_trained_circuits(new_env_states)
+
+    # if trained_circuits:
+    #     for idx, circuit in enumerate(trained_circuits):
+    #         print(f"[{global_step}] Circuit {idx} (len={circuit.shape[0]}):\n{circuit}")
+
     # Update game statistics.
     new_game_stats = self._update_game_stats(run_state, new_env_states)
 
@@ -525,6 +540,8 @@ class Agent:
         opt_state=new_opt_state,
         game_stats=new_game_stats,
         rng=rngs[6],
+        demonstrations_actions = demonstrations_actions,
+        actions=actions,
     )
 
   @functools.partial(jax.jit, static_argnums=(0,))
@@ -540,9 +557,17 @@ class Agent:
     Returns:
       The new run state, after running `eval_frequency_steps` tranining steps.
     """
-    return jax.lax.fori_loop(
+
+    new_run_state = jax.lax.fori_loop(
         lower=global_step,
         upper=self._config.exp_config.eval_frequency_steps + global_step,
         body_fun=self._run_iteration_agent_env_interaction,
         init_val=run_state,
     )
+
+    # ✅ Safe to call here (outside JIT)
+    # trained_circuits = self._extract_trained_circuits(new_run_state.env_states)
+    # for idx, circuit in enumerate(trained_circuits):
+    #     print(f"[End of Loop] Circuit {idx} (len={circuit.shape[0]}):\n{circuit}")
+
+    return new_run_state

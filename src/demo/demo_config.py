@@ -86,19 +86,22 @@ def get_demo_config(use_gadgets: bool) -> DemoConfig:
         tensors.CircuitType.MOD_5_4,
     ]
   else:
-    target_circuit_types = [
-        # A tensor of size 5 and rank 7.
-        tensors.CircuitType.MOD_5_4,
-        # A tensor of size 8 and rank 13.
-        tensors.CircuitType.BARENCO_TOFF_3,
-        # A tensor of size 7 and rank 13.
-        tensors.CircuitType.NC_TOFF_3,
-    ]
+    # target_circuit_types = [
+    #     # A tensor of size 5 and rank 7.
+    #     tensors.CircuitType.MOD_5_4,
+    #     # A tensor of size 8 and rank 13.
+    #     tensors.CircuitType.BARENCO_TOFF_3,
+    #     # A tensor of size 7 and rank 13.
+    #     tensors.CircuitType.NC_TOFF_3,
+    # ]
+    target_circuit_types = list(tensors.CircuitType)
+
 
   exp_config = ExperimentParams(
       batch_size=128,
       num_mcts_simulations=80,
       num_training_steps=50_000,
+      # num_training_steps=200,
       eval_frequency_steps=50,
       loss=LossParams(
           init_demonstrations_weight=1.0,

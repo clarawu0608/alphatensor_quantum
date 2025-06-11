@@ -51,7 +51,7 @@ from alphatensor_quantum.src.demo import demo_config
 def main(_):
   # Set up the hyperparameters for the demo.
   config = demo_config.get_demo_config(
-      use_gadgets=True  # Set to `False` for an experiment without gadgets.
+      use_gadgets=False  # Set to `False` for an experiment without gadgets.
   )
   exp_config = config.exp_config
 
@@ -59,6 +59,8 @@ def main(_):
   agent = agent_lib.Agent(config)
   run_state = agent.init_run_state(jax.random.PRNGKey(2024))
 
+  best_circuits = [None for _ in config.env_config.target_circuit_types]
+  best_returns = [float('inf') for _ in config.env_config.target_circuit_types]
   # Main loop.
   for step in range(
       0, exp_config.num_training_steps, exp_config.eval_frequency_steps
@@ -71,6 +73,8 @@ def main(_):
     # least one completed episode.
     num_games = run_state.game_stats.num_games
     avg_return = run_state.game_stats.avg_return
+    actions = run_state.actions
+    demonstration_actions = run_state.demonstrations_actions
     avg_return = jnp.sum(
         jnp.where(
             num_games > 0,
@@ -84,9 +88,43 @@ def main(_):
         f'Running Average Returns: {avg_return} .. '
         f'Time taken: {time_taken} seconds/step'
     )
+    print(f'Actions: {actions}')
+    print(f'Demonstration Actions: {demonstration_actions}')
     for t, target_circuit in enumerate(config.env_config.target_circuit_types):
       tcount = int(-run_state.game_stats.best_return[t])
       print(f'  Best T-count for {target_circuit.name.lower()}: {tcount}')
+
+    # env_states = jax.device_get(run_state.env_states)
+    # num_moves = env_states.num_moves
+
+    # # Get top-3 shortest circuits in the batch (most efficient = best T-count)
+    # top_k = 3
+    # sorted_indices = jnp.argsort(num_moves)[:top_k]
+
+    # print(f"\n[Step {step}] Top {top_k} shortest circuits in current batch:")
+
+    # for rank, idx in enumerate(sorted_indices):
+    #     moves = int(num_moves[idx])
+    #     if moves > 0:
+    #         circuit = env_states.past_factors[idx, :moves]
+    #         print(f"  Top-{rank+1}: T-count = {moves}")
+    #         print(circuit)
+
+    env_states = jax.device_get(run_state.env_states)
+    num_moves = env_states.num_moves
+    init_tensor_index = env_states.init_tensor_index
+
+    for i in range(env_states.past_factors.shape[0]):
+        if env_states.is_terminal[i]:
+            moves = int(num_moves[i])
+            t_idx = int(init_tensor_index[i])
+            reward = -moves  # more moves = worse
+
+            if reward < best_returns[t_idx]:
+                best_returns[t_idx] = reward
+                best_circuits[t_idx] = env_states.past_factors[i, :moves]
+                print(f"🎉 New best T-count for {config.env_config.target_circuit_types[t_idx].name}: {-reward}")
+                print(best_circuits[t_idx])
 
 
 if __name__ == '__main__':
