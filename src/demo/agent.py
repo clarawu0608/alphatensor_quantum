@@ -558,11 +558,50 @@ class Agent:
       The new run state, after running `eval_frequency_steps` tranining steps.
     """
 
+    T = self._config.exp_config.eval_frequency_steps
+    action_shape = run_state.actions.shape
+    T = self._config.exp_config.eval_frequency_steps
+    B = run_state.env_states.is_terminal.shape[0]
+    S = run_state.env_states.change_of_basis.shape[-1]
+
+    init_val = {
+        "run_state": run_state,
+        "actions_log": jnp.zeros((T,) + action_shape, dtype=run_state.actions.dtype),
+        "is_terminal_log": jnp.zeros((T, B), dtype=run_state.env_states.is_terminal.dtype),
+        "init_tensor_index_log": jnp.zeros((T, B), dtype=run_state.env_states.init_tensor_index.dtype),
+        "change_of_basis_log": jnp.zeros((T, B, S, S), dtype=run_state.env_states.change_of_basis.dtype),
+    }
+
+    def body_fun(i, carry):
+        run_state = carry["run_state"]
+        actions_log = carry["actions_log"]
+        is_terminal_log = carry["is_terminal_log"]
+        init_tensor_index_log = carry["init_tensor_index_log"]
+        change_of_basis_log = carry["change_of_basis_log"]
+
+        new_run_state = self._run_iteration_agent_env_interaction(i, run_state)
+        env_state = new_run_state.env_states
+
+        actions_log = actions_log.at[i].set(new_run_state.actions)
+        is_terminal_log = is_terminal_log.at[i].set(env_state.is_terminal)
+        init_tensor_index_log = init_tensor_index_log.at[i].set(env_state.init_tensor_index)
+        change_of_basis_log = change_of_basis_log.at[i].set(env_state.change_of_basis)
+
+        return {
+            "run_state": new_run_state,
+            "actions_log": actions_log,
+            "is_terminal_log": is_terminal_log,
+            "init_tensor_index_log": init_tensor_index_log,
+            "change_of_basis_log": change_of_basis_log,
+        }
+
+
+
     new_run_state = jax.lax.fori_loop(
         lower=global_step,
         upper=self._config.exp_config.eval_frequency_steps + global_step,
-        body_fun=self._run_iteration_agent_env_interaction,
-        init_val=run_state,
+        body_fun=body_fun,
+        init_val=init_val, # To recsord EnvState, Actions, and Demonstrations
     )
 
     # ✅ Safe to call here (outside JIT)

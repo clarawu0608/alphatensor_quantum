@@ -24,3 +24,5 @@ share/python-wheels/
 MANIFEST
 _deps/
 CMakeFiles/
+*.log
+external/

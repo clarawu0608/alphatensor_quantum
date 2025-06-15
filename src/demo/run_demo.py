@@ -44,6 +44,10 @@ from absl import app
 import jax
 import jax.numpy as jnp
 
+import numpy as np
+import json
+import os
+
 from alphatensor_quantum.src.demo import agent as agent_lib
 from alphatensor_quantum.src.demo import demo_config
 
@@ -66,7 +70,8 @@ def main(_):
       0, exp_config.num_training_steps, exp_config.eval_frequency_steps
   ):
     time_start = time.time()
-    run_state = agent.run_agent_env_interaction(step, run_state)
+    results = agent.run_agent_env_interaction(step, run_state)
+    run_state = results["run_state"]
     time_taken = (time.time() - time_start) / exp_config.eval_frequency_steps
     # Keep track of the average return (for reporting purposes). We use a
     # debiased version of `avg_return` that only includes batch elements with at
@@ -89,9 +94,46 @@ def main(_):
         f'Running Average Returns: {avg_return} .. '
         f'Time taken: {time_taken} seconds/step'
     )
-    print(f'Actions: {actions}')
-    print(f'Demonstration Actions: {demonstration_actions}')
-    print(f'Env States: {env_states}')
+
+    
+    # Unpack batched logs from the current result
+    log_length = results["actions_log"].shape[0]  # Typically equals eval_frequency_steps
+    base_step = step  # This is the starting step of this batch
+
+    # Convert JAX arrays to NumPy arrays
+    actions_seq = np.array(results["actions_log"])  # shape (T, B, ...)
+    is_terminal_seq = np.array(results["is_terminal_log"])  # shape (T, B)
+    init_tensor_index_seq = np.array(results["init_tensor_index_log"])  # shape (T, B)
+    change_of_basis_seq = np.array(results["change_of_basis_log"])  # shape (T, B, S, S)
+
+    # Loop through each time step in the batch
+    for t in range(log_length):
+        step_id = base_step + t  # Actual global step number
+
+        # Package the data for this step
+        log_dict = {
+            f"step_{step_id}": {
+                "actions": actions_seq[t].tolist(),
+                "is_terminal": is_terminal_seq[t].tolist(),
+                "init_tensor_index": init_tensor_index_seq[t].tolist(),
+                "change_of_basis": change_of_basis_seq[t].tolist()
+            }
+        }
+
+        # Define output file name
+        if not os.path.exists("trajectory_logs"):
+          os.makedirs("trajectory_logs")
+        file_name = f"trajectory_logs/step_{step_id}.json"
+
+        # Save as JSON
+        with open(file_name, "w") as f:
+            json.dump(log_dict, f)
+
+
+
+    # print(f'Actions: {actions}')
+    # print(f'Demonstration Actions: {demonstration_actions}')
+    # print(f'Env States: {env_states}')
     for t, target_circuit in enumerate(config.env_config.target_circuit_types):
       tcount = int(-run_state.game_stats.best_return[t])
       print(f'  Best T-count for {target_circuit.name.lower()}: {tcount}')
