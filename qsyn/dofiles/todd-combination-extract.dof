@@ -1,0 +1,8 @@
+qcir read benchmark/SABRE/small/3_17_13.qasm
+qcir print
+qc2tabl
+tabl opt tmerge
+tabl opt hopt
+tabl opt ph todd
+tabl2qc
+qcir print

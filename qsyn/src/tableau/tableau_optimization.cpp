@@ -407,9 +407,11 @@ void merge_rotations(Tableau& tableau) {
  * @param strategy
  */
 void optimize_phase_polynomial(StabilizerTableau& clifford, std::vector<PauliRotation>& polynomial, PhasePolynomialOptimizationStrategy const& strategy) {
+    spdlog::debug("Optimizing phase polynomial in optimize_phase_polynomial (3 args)");
     if (!is_phase_polynomial(polynomial)) {
         return;
     }
+    spdlog::debug("Optimizing phase polynomial with {} terms in 3-args opt phasepoly", polynomial.size());
 
     std::tie(clifford, polynomial) = strategy.optimize(clifford, polynomial);
 }
@@ -421,17 +423,22 @@ void optimize_phase_polynomial(StabilizerTableau& clifford, std::vector<PauliRot
  * @param strategy
  */
 void optimize_phase_polynomial(Tableau& tableau, PhasePolynomialOptimizationStrategy const& strategy) {
+    spdlog::debug("Optimizing phase polynomial in optimize_phase_polynomial (2 args)");
     if (tableau.is_empty()) {
         return;
     }
+
+    spdlog::debug("Optimizing phase polynomial with {} sub-tableaux in 2-args opt phasepoly", tableau.size());
     // if the first sub-tableau is a list of PauliRotations, prepend a stabilizer tableau to the front
     if (std::holds_alternative<std::vector<PauliRotation>>(tableau.front())) {
+        spdlog::debug("Prepending a StabilizerTableau to the front of the tableau");
         tableau.insert(tableau.begin(), StabilizerTableau{tableau.n_qubits()});
     }
 
     auto last_clifford = std::ref(std::get<StabilizerTableau>(tableau.front()));
     for (auto& subtableau : tableau) {
         if (auto pr = std::get_if<std::vector<PauliRotation>>(&subtableau)) {
+            spdlog::debug("Call optimize_phase_polynomial on {} terms", pr->size());
             optimize_phase_polynomial(last_clifford.get(), *pr, strategy);
         } else {
             last_clifford = std::get<StabilizerTableau>(subtableau);

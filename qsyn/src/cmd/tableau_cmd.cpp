@@ -244,6 +244,7 @@ dvlab::Command tableau_optimization_cmd(TableauMgr& tableau_mgr) {
                 } else if (dvlab::str::is_prefix_of(method_str, "hopt")) {
                     return OptimizationMethod::internal_h_opt;
                 } else if (dvlab::str::is_prefix_of(method_str, "phasepoly")) {
+                    spdlog::debug("Using phase polynomial optimization method");
                     return OptimizationMethod::phase_polynomial_optimization;
                 } else if (dvlab::str::is_prefix_of(method_str, "matpar")) {
                     return OptimizationMethod::matroid_partition;
@@ -257,7 +258,10 @@ dvlab::Command tableau_optimization_cmd(TableauMgr& tableau_mgr) {
             }
 
             auto const do_phase_polynomial_optimization = [&]() {
+                
                 auto const phasepoly_strategy_str = parser.get<std::string>("strategy");
+
+                spdlog::debug("Using phase polynomial optimization method strategy `{}`", phasepoly_strategy_str);
 
                 auto const phasepoly_strategy = std::invoke([&]() -> std::unique_ptr<PhasePolynomialOptimizationStrategy> {
                     if (dvlab::str::is_prefix_of(phasepoly_strategy_str, "todd")) {

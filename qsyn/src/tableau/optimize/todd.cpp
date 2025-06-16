@@ -364,6 +364,9 @@ private:
 }  // namespace
 
 std::pair<StabilizerTableau, Polynomial> ToddPhasePolynomialOptimizationStrategy::optimize(StabilizerTableau const& clifford, Polynomial const& polynomial) const {
+    
+    spdlog::debug("JUST STARTED TODD OPTIMIZATION");
+
     if (polynomial.empty()) {
         fmt::println("Polynomial is empty, returning the input Clifford and polynomial");
         return {clifford, polynomial};
@@ -382,18 +385,28 @@ std::pair<StabilizerTableau, Polynomial> ToddPhasePolynomialOptimizationStrategy
     auto multi_linear_polynomial = MultiLinearPolynomial();
     multi_linear_polynomial.add_rotations(ret_polynomial, false);
 
+    spdlog::debug("Start write files for polynomial before TODD optimization");
+
     {
-        std::ofstream file("./outputs/before/polynomial-before-todd.txt", std::ios::trunc);
+        // Step 1: Find the first available filename polynomial-before-todd-N.txt
+        std::string filename;
+        int index = 1;
+        do {
+            filename = fmt::format("./outputs/polynomial-before-todd-{}.txt", index++);
+        } while (std::filesystem::exists(filename));
+
+        std::ofstream file(filename, std::ios::trunc);
         if (!file.is_open()) {
-            spdlog::error("Failed to open polynomial-before-todd.txt for writing.");
+            spdlog::error("Failed to open {} for writing.", filename);
         } else {
+            spdlog::info("Writing phase polynomial to: {}", filename);
             file << "[\n";
             for (size_t idx = 0; idx < ret_polynomial.size(); ++idx) {
                 auto const& rotation = ret_polynomial[idx];
                 auto const& pauli_str = fmt::format("{}", rotation);  // e.g., exp(i * π/4 * ZIZ)
 
                 std::string bit_array = "[";
-                for (char c : pauli_str | std::views::reverse) {  // Pauli string is at the end
+                for (char c : pauli_str | std::views::reverse) {
                     if (c == 'Z') bit_array += "1, ";
                     else if (c == 'I') bit_array += "0, ";
                 }
@@ -415,8 +428,8 @@ std::pair<StabilizerTableau, Polynomial> ToddPhasePolynomialOptimizationStrategy
     spdlog::trace("Polynomial before TODD:\n{}", fmt::join(ret_polynomial, "\n"));
     spdlog::debug("num_terms before TODD: {}", ret_polynomial.size());
 
-    for (auto const& r : ret_polynomial)
-        spdlog::debug("[BEFORE] {}", r);
+    // for (auto const& r : ret_polynomial)
+    //     spdlog::debug("[BEFORE] {}", r);
 
     while (true) {
         auto const num_terms = ret_polynomial.size();
@@ -429,44 +442,35 @@ std::pair<StabilizerTableau, Polynomial> ToddPhasePolynomialOptimizationStrategy
     }
     
     {
-        std::ofstream file("./outputs/after/polynomial-after-todd.txt", std::ios::trunc);
-        if (!file.is_open()) {
-            spdlog::error("Failed to open polynomial-after-todd.txt for writing.");
-        } else {
-            file << "[\n";
-            for (size_t idx = 0; idx < ret_polynomial.size(); ++idx) {
-                auto const& rotation = ret_polynomial[idx];
-                auto const& pauli_str = fmt::format("{}", rotation);  // e.g., exp(i * π/4 * ZIZ)
+        namespace fs = std::filesystem;
+            std::string read_filename;
+        std::string renamed_filename;
+        int index = 1;
 
-                std::string bit_array = "[";
-                for (char c : pauli_str | std::views::reverse) {  // Pauli string is at the end
-                    if (c == 'Z') bit_array += "1, ";
-                    else if (c == 'I') bit_array += "0, ";
-                }
-
-                // Remove trailing comma and space
-                if (bit_array.size() > 1) bit_array.pop_back(), bit_array.pop_back();
-                bit_array += "]";
-
-                file << "  " << bit_array;
-                if (idx + 1 != ret_polynomial.size()) file << ",";
-                file << "\n";
+        // Step 1: Find the first available -todd-N.txt file
+        while (true) {
+            read_filename = fmt::format("./outputs/polynomial-after-todd-{}.txt", index);
+            if (fs::exists(read_filename)) {
+                renamed_filename = fmt::format("./outputs/polynomial-after-todd-{}-read.txt", index);
+                break;
             }
-            file << "]\n";
+            ++index;
+
+            // Optional safety cap
+            if (index > 1000) {
+                spdlog::warn("Checked 1000 files, none found for polynomial-after-todd-N.txt.");
+                return {clifford, polynomial};
+            }
         }
-    }
 
-
-    {
-        std::ifstream file("./outputs/polynomial-after-todd.txt");
+        std::ifstream file(read_filename);
         if (!file.is_open()) {
-            spdlog::warn("Could not open polynomial-after-todd.txt, skipping override.");
+            spdlog::warn("Could not open {} for reading.", read_filename);
         } else {
             Polynomial override_poly;
             std::string line;
 
             while (std::getline(file, line)) {
-                // Skip non-array lines
                 if (line.find('[') == std::string::npos || line.find(']') == std::string::npos)
                     continue;
 
@@ -477,10 +481,8 @@ std::pair<StabilizerTableau, Polynomial> ToddPhasePolynomialOptimizationStrategy
                 while (bits >> c) {
                     if (c == '0') paulis.push_back(Pauli::i);
                     else if (c == '1') paulis.push_back(Pauli::z);
-                    // ignore [, ], commas
                 }
 
-                // reverse to restore LSB→MSB if needed
                 std::reverse(paulis.begin(), paulis.end());
 
                 dvlab::Phase phase(1, 4);  // always π/4
@@ -488,11 +490,14 @@ std::pair<StabilizerTableau, Polynomial> ToddPhasePolynomialOptimizationStrategy
             }
 
             if (!override_poly.empty()) {
-                spdlog::info("Replaced polynomial with {} terms from polynomial-after-todd.txt.", override_poly.size());
+                spdlog::info("Read {} terms from {} and renamed it to {}", override_poly.size(), read_filename, renamed_filename);
                 ret_polynomial = std::move(override_poly);
                 properize(ret_clifford, ret_polynomial);
+
+                // Rename the file
+                fs::rename(read_filename, renamed_filename);
             } else {
-                spdlog::warn("No valid terms loaded.");
+                spdlog::warn("No valid terms loaded from {}.", read_filename);
             }
         }
     }
