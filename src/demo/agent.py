@@ -17,10 +17,12 @@
 
 import functools
 from typing import NamedTuple
+from dataclasses import dataclass
 
 import chex
 import haiku as hk
 import jax
+from jax import debug
 import jax.numpy as jnp
 import jaxtyping as jt
 import mctx
@@ -523,7 +525,6 @@ class Agent:
         ),
         new_env_states
     )
-
     # Reset the demonstrations and their states if the corresponding episodes
     # have terminated.
     (
@@ -544,7 +545,7 @@ class Agent:
         actions=actions,
     )
 
-  @functools.partial(jax.jit, static_argnums=(0,))
+#   @functools.partial(jax.jit, static_argnums=(0,))
   def run_agent_env_interaction(
       self, global_step: int, run_state: RunState
   ) -> RunState:
@@ -564,49 +565,66 @@ class Agent:
     B = run_state.env_states.is_terminal.shape[0]
     S = run_state.env_states.change_of_basis.shape[-1]
 
-    init_val = {
-        "run_state": run_state,
-        "actions_log": jnp.zeros((T,) + action_shape, dtype=run_state.actions.dtype),
-        "is_terminal_log": jnp.zeros((T, B), dtype=run_state.env_states.is_terminal.dtype),
-        "init_tensor_index_log": jnp.zeros((T, B), dtype=run_state.env_states.init_tensor_index.dtype),
-        "change_of_basis_log": jnp.zeros((T, B, S, S), dtype=run_state.env_states.change_of_basis.dtype),
-    }
 
-    def body_fun(i, carry):
-        run_state = carry["run_state"]
-        actions_log = carry["actions_log"]
-        is_terminal_log = carry["is_terminal_log"]
-        init_tensor_index_log = carry["init_tensor_index_log"]
-        change_of_basis_log = carry["change_of_basis_log"]
+    @dataclass(frozen=True)
+    class LoopCarry:
+        run_state: RunState
+        actions_log: jnp.ndarray
+        is_terminal_log: jnp.ndarray
+        init_tensor_index_log: jnp.ndarray
+        change_of_basis_log: jnp.ndarray
 
+    jax.tree_util.register_pytree_node(
+        LoopCarry,
+        lambda c: (
+            (c.run_state, c.actions_log, c.is_terminal_log, c.init_tensor_index_log, c.change_of_basis_log),
+            None  # no static metadata
+        ),
+        lambda _, children: LoopCarry(*children)
+    )
+
+
+    init_val = LoopCarry(
+        run_state=run_state,
+        actions_log=jnp.zeros((T,) + action_shape, dtype=run_state.actions.dtype),
+        is_terminal_log=jnp.zeros((T, B), dtype=run_state.env_states.is_terminal.dtype),
+        init_tensor_index_log=jnp.zeros((T, B), dtype=run_state.env_states.init_tensor_index.dtype),
+        change_of_basis_log=jnp.zeros((T, B, S, S), dtype=run_state.env_states.change_of_basis.dtype),
+    )
+
+
+    def body_fun(i, carry: LoopCarry) -> LoopCarry:
+        run_state = carry.run_state
         new_run_state = self._run_iteration_agent_env_interaction(i, run_state)
         env_state = new_run_state.env_states
 
-        actions_log = actions_log.at[i].set(new_run_state.actions)
-        is_terminal_log = is_terminal_log.at[i].set(env_state.is_terminal)
-        init_tensor_index_log = init_tensor_index_log.at[i].set(env_state.init_tensor_index)
-        change_of_basis_log = change_of_basis_log.at[i].set(env_state.change_of_basis)
+        debug.print("Step {}: actions = {}", i, new_run_state.actions)
+        debug.print("Step {}: is_terminal = {}", i, env_state.is_terminal)
+        debug.print("Step {}: init_tensor_index = {}", i, env_state.init_tensor_index)
+        debug.print("Step {}: change_of_basis = {}", i, env_state.change_of_basis)
 
-        return {
-            "run_state": new_run_state,
-            "actions_log": actions_log,
-            "is_terminal_log": is_terminal_log,
-            "init_tensor_index_log": init_tensor_index_log,
-            "change_of_basis_log": change_of_basis_log,
-        }
+        return LoopCarry(
+            run_state=new_run_state,
+            actions_log=carry.actions_log.at[i].set(new_run_state.actions),
+            is_terminal_log=carry.is_terminal_log.at[i].set(env_state.is_terminal),
+            init_tensor_index_log=carry.init_tensor_index_log.at[i].set(env_state.init_tensor_index),
+            change_of_basis_log=carry.change_of_basis_log.at[i].set(env_state.change_of_basis),
+        )
 
 
 
-    new_run_state = jax.lax.fori_loop(
+
+    results = jax.lax.fori_loop(
         lower=global_step,
         upper=self._config.exp_config.eval_frequency_steps + global_step,
         body_fun=body_fun,
         init_val=init_val, # To recsord EnvState, Actions, and Demonstrations
     )
 
-    # ✅ Safe to call here (outside JIT)
-    # trained_circuits = self._extract_trained_circuits(new_run_state.env_states)
-    # for idx, circuit in enumerate(trained_circuits):
-    #     print(f"[End of Loop] Circuit {idx} (len={circuit.shape[0]}):\n{circuit}")
-
-    return new_run_state
+    return {
+        "run_state": results.run_state,
+        "actions_log": results.actions_log,
+        "is_terminal_log": results.is_terminal_log,
+        "init_tensor_index_log": results.init_tensor_index_log,
+        "change_of_basis_log": results.change_of_basis_log,
+    }
