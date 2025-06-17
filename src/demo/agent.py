@@ -33,6 +33,7 @@ from alphatensor_quantum.src import demonstrations as demonstrations_lib
 from alphatensor_quantum.src import environment
 from alphatensor_quantum.src import networks
 from alphatensor_quantum.src.demo import demo_config
+from alphatensor_quantum.src import factors
 
 
 class GameStats(NamedTuple):
@@ -207,7 +208,7 @@ class Agent:
             (self._config.exp_config.batch_size, num_target_tensors,),
             dtype=jnp.int32
         ),
-        best_return=jnp.array([-jnp.inf] * num_target_tensors),
+        best_return=jnp.array([-jnp.inf] * num_target_tensors), # Init: -inf for each target
         avg_return=jnp.zeros(
             (self._config.exp_config.batch_size, num_target_tensors)
         ),
@@ -507,12 +508,22 @@ class Agent:
     new_env_states = self._env.step(actions, run_state.env_states)
     is_terminal = new_env_states.is_terminal
 
-    # # Log or save completed circuits
-    # trained_circuits = self._extract_trained_circuits(new_env_states)
-
-    # if trained_circuits:
-    #     for idx, circuit in enumerate(trained_circuits):
-    #         print(f"[{global_step}] Circuit {idx} (len={circuit.shape[0]}):\n{circuit}")
+    # output debug information
+    # debug.print("Step {}: is_terminal = {}", global_step, is_terminal)
+    debug.print("Step {}: actions = {}", global_step, actions)
+    jax.lax.fori_loop(
+        0,
+        is_terminal.shape[0],
+        lambda j, _: jax.lax.cond(
+            is_terminal[j],
+            lambda _: debug.print("Step {}: is_terminal index {}", global_step, j),
+            lambda _: None,
+            operand=None
+        ),
+        init_val=None
+    )
+    debug.print("Step {}: init_tensor_index = {}", global_step, new_env_states.init_tensor_index)
+    # debug.print("Step {}: change_of_basis = {}", global_step, new_env_states.change_of_basis)
 
     # Update game statistics.
     new_game_stats = self._update_game_stats(run_state, new_env_states)
@@ -532,6 +543,17 @@ class Agent:
     ) = self._update_demonstrations_and_states(
         demonstrations_actions, run_state, rngs[5]
     )
+
+
+    debug.print("Step {}:", global_step)
+    config = demo_config.get_demo_config(
+        use_gadgets=False  # Set to `False` for an experiment without gadgets.
+    )
+    for t, target_circuit in enumerate(config.env_config.target_circuit_types):
+        tcount = jnp.array(-new_game_stats.best_return[t], dtype=int) # negative reward is T-count
+        debug.print('  Best T-count for {}: {}', t, tcount)
+
+    
 
     return RunState(
         params=new_params,
@@ -598,10 +620,7 @@ class Agent:
         new_run_state = self._run_iteration_agent_env_interaction(i, run_state)
         env_state = new_run_state.env_states
 
-        debug.print("Step {}: actions = {}", i, new_run_state.actions)
-        debug.print("Step {}: is_terminal = {}", i, env_state.is_terminal)
-        debug.print("Step {}: init_tensor_index = {}", i, env_state.init_tensor_index)
-        debug.print("Step {}: change_of_basis = {}", i, env_state.change_of_basis)
+        
 
         return LoopCarry(
             run_state=new_run_state,

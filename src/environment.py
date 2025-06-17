@@ -22,6 +22,7 @@ import chex
 import jax
 import jax.numpy as jnp
 import jaxtyping as jt
+from jax import debug
 
 from alphatensor_quantum.src import change_of_basis as change_of_basis_lib
 from alphatensor_quantum.src import config as config_lib

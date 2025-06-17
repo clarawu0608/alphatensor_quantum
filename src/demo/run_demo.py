@@ -106,36 +106,8 @@ def main(_):
     init_tensor_index_seq = np.array(results["init_tensor_index_log"])  # shape (T, B)
     change_of_basis_seq = np.array(results["change_of_basis_log"])  # shape (T, B, S, S)
 
-    # Loop through each time step in the batch
-    # for t in range(log_length):
-    #     step_id = base_step + t  # Actual global step number
-
-    #     # Package the data for this step
-    #     log_dict = {
-    #         f"step_{step_id}": {
-    #             "actions": actions_seq[t].tolist(),
-    #             "is_terminal": is_terminal_seq[t].tolist(),
-    #             "init_tensor_index": init_tensor_index_seq[t].tolist(),
-    #             "change_of_basis": change_of_basis_seq[t].tolist()
-    #         }
-    #     }
-
-    #     # Define output file name
-    #     if not os.path.exists("trajectory_logs"):
-    #       os.makedirs("trajectory_logs")
-    #     file_name = f"trajectory_logs/step_{step_id}.json"
-
-    #     # Save as JSON
-    #     with open(file_name, "w") as f:
-    #         json.dump(log_dict, f)
-
-
-
-    # print(f'Actions: {actions}')
-    # print(f'Demonstration Actions: {demonstration_actions}')
-    # print(f'Env States[init_tensor_index]: {env_states.init_tensor_index}')
     for t, target_circuit in enumerate(config.env_config.target_circuit_types):
-      tcount = int(-run_state.game_stats.best_return[t])
+      tcount = int(-run_state.game_stats.best_return[t]) # negative reward is T-count
       print(f'  Best T-count for {target_circuit.name.lower()}: {tcount}')
 
 
