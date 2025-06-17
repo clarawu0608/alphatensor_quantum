@@ -50,6 +50,8 @@ import os
 
 from alphatensor_quantum.src.demo import agent as agent_lib
 from alphatensor_quantum.src.demo import demo_config
+from alphatensor_quantum.src.factors import action_index_to_factor
+from alphatensor_quantum.src import tensors
 
 
 def main(_):
@@ -106,9 +108,24 @@ def main(_):
     init_tensor_index_seq = np.array(results["init_tensor_index_log"])  # shape (T, B)
     change_of_basis_seq = np.array(results["change_of_basis_log"])  # shape (T, B, S, S)
 
+    all_tensor_sizes = [
+        tensors.get_signature_tensor(circuit_type).shape[0]
+        for circuit_type in config.env_config.target_circuit_types
+    ]
     for t, target_circuit in enumerate(config.env_config.target_circuit_types):
       tcount = int(-run_state.game_stats.best_return[t]) # negative reward is T-count
       print(f'  Best T-count for {target_circuit.name.lower()}: {tcount}')
+      print(f'  Best actions for {target_circuit.name.lower()}: {run_state.game_stats.best_actions[t]}')
+      
+      actions = run_state.game_stats.best_actions[t]
+
+      factors_list = []
+      for action in reversed(run_state.game_stats.best_actions[t]):
+          if action != -1:
+              factor = action_index_to_factor(action, all_tensor_sizes[t])
+              factors_list.append(factor)
+      print(f'  Best factors for {target_circuit.name.lower()}: {factors_list}')
+    
 
 
 

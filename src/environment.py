@@ -54,6 +54,7 @@ class EnvState(NamedTuple):
   """
   tensor: jt.Integer[jt.Array, '*batch size size size']
   past_factors: jt.Integer[jt.Array, '*batch max_num_moves size']
+  past_actions: jt.Integer[jt.Array, '*batch max_num_moves']
   num_moves: jt.Integer[jt.Array, '*batch']
   last_reward: jt.Float[jt.Array, '*batch']
   sum_rewards: jt.Float[jt.Array, '*batch']
@@ -130,6 +131,9 @@ class Environment:
     new_past_factors = jnp.concatenate(
         [env_state.past_factors[1:], factor[None]], axis=0
     )
+    new_past_actions = jnp.concatenate(
+        [env_state.past_actions[1:], action[None]], axis=0
+    )
     new_num_moves = env_state.num_moves + 1
     # The episode terminates when either we reach the all-zero tensor, or we
     # exceed the maximum number of moves.
@@ -187,6 +191,7 @@ class Environment:
     return EnvState(
         tensor=new_tensor,
         past_factors=new_past_factors,
+        past_actions= new_past_actions,
         num_moves=new_num_moves,
         is_terminal=is_terminal,
         last_reward=reward,
@@ -272,6 +277,8 @@ class Environment:
             (self._config.max_num_moves, self._config.max_tensor_size),
             dtype=jnp.int32
         ),
+        past_actions=-jnp.ones(
+            (self._config.max_num_moves), dtype=jnp.int32),
         num_moves=jnp.zeros((), dtype=jnp.int32),
         is_terminal=jnp.zeros((), dtype=jnp.bool_),
         last_reward=jnp.zeros(()),
@@ -301,6 +308,8 @@ class Environment:
             (self._config.max_num_moves, self._config.max_tensor_size),
             dtype=jnp.int32
         ),
+        past_actions=jnp.zeros(
+            (self._config.max_num_moves), dtype=jnp.int32),
         num_moves=jnp.zeros((), dtype=jnp.int32),
         is_terminal=jnp.zeros((), dtype=jnp.bool_),
         last_reward=jnp.zeros(()),

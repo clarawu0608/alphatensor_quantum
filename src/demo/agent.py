@@ -51,6 +51,7 @@ class GameStats(NamedTuple):
   """
   num_games: jt.Integer[jt.Array, 'batch_size num_target_tensors']
   best_return: jt.Float[jt.Array, 'num_target_tensors']
+  best_actions: jt.Integer[jt.Array, 'max_num_moves num_target_tensors']
   avg_return: jt.Float[jt.Array, 'batch_size num_target_tensors']
 
 
@@ -209,6 +210,10 @@ class Agent:
             dtype=jnp.int32
         ),
         best_return=jnp.array([-jnp.inf] * num_target_tensors), # Init: -inf for each target
+        best_actions=-jnp.ones(
+            (num_target_tensors, self._config.env_config.max_num_moves),
+            dtype=jnp.int32
+        ),
         avg_return=jnp.zeros(
             (self._config.exp_config.batch_size, num_target_tensors)
         ),
@@ -369,26 +374,76 @@ class Agent:
         run_state.game_stats.avg_return
     )
     num_target_tensors = len(self._config.env_config.target_circuit_types)
-    negative_inf = -jnp.inf * jnp.ones(
-        (self._config.exp_config.batch_size, num_target_tensors)
-    )
-    new_best_return_if_terminal = jax.vmap(lambda x, v, i: x.at[i].set(v))(
-        negative_inf,
-        new_env_states.sum_rewards,
-        new_env_states.init_tensor_index
-    )
-    new_best_return = jnp.maximum(
-        run_state.game_stats.best_return,
-        jnp.max(jnp.where(
-            _broadcast_shapes(is_terminal, new_best_return_if_terminal),
-            new_best_return_if_terminal,
-            negative_inf
-        ), axis=0)
-    )
+    # negative_inf = -jnp.inf * jnp.ones(
+    #     (self._config.exp_config.batch_size, num_target_tensors)
+    # )
+    # new_best_return_if_terminal = jax.vmap(lambda x, v, i: x.at[i].set(v))(
+    #     negative_inf,
+    #     new_env_states.sum_rewards,
+    #     new_env_states.init_tensor_index
+    # )
+    # new_best_return = jnp.maximum(
+    #     run_state.game_stats.best_return,
+    #     jnp.max(jnp.where(
+    #         _broadcast_shapes(is_terminal, new_best_return_if_terminal),
+    #         new_best_return_if_terminal,
+    #         negative_inf
+    #     ), axis=0)
+    # )
+    # === best_return update ===
+    negative_inf = -jnp.inf * jnp.ones((self._config.exp_config.batch_size, num_target_tensors))
+    new_best_return_if_terminal = jax.vmap(lambda x, v, i: x.at[i].set(v))( # for batch_size samples
+        negative_inf, new_env_states.sum_rewards, new_env_states.init_tensor_index)
+    best_return_mask = _broadcast_shapes(is_terminal, new_best_return_if_terminal)
+    new_best_return_if_terminal = jnp.where(
+        best_return_mask, new_best_return_if_terminal, negative_inf)
+
+    best_return_per_target = jnp.max(new_best_return_if_terminal, axis=0)
+    max_index = jnp.argmax(new_best_return_if_terminal, axis=0) # (17)
+    new_best_return = jnp.maximum(run_state.game_stats.best_return, best_return_per_target)
+    update = (new_best_return != run_state.game_stats.best_return)
+
+    # === best_actions update ===
+    # For each target tensor, get the batch index with best return
+    # init_state = jnp.zeros(
+    #     (self._config.exp_config.batch_size, num_target_tensors, self._config.env_config.max_num_moves),
+    #     dtype=jnp.int32
+    # ) # (128, 17, 30)
+    # new_best_actions_if_terminal = jax.vmap(lambda x, v, i: x.at[i].set(v))(
+    #    init_state, new_env_states.past_actions, new_env_states.init_tensor_index) # (128, 17), (128, 30), (128)
+    # best_actions_mask = _broadcast_shapes(
+    #     is_terminal, new_best_actions_if_terminal
+    # )
+    # new_best_actions_if_terminal = jnp.where(
+    #     best_actions_mask, new_best_actions_if_terminal, init_state) # (128, 17, 30)
+    
+    new_best_actions = run_state.game_stats.best_actions
+    # debug.print("shape of new_best_actions: {}", new_best_actions.shape)
+    # debug.print("max_index = {}", max_index)
+    # for i, idx in enumerate(max_index):
+    #   debug.print("max_index[{}] = {}", i, new_best_return_if_terminal[idx, i])
+    def update_loop(i, best_actions):
+        idx = max_index[i]
+        should_update = update[i]
+
+        def do_update(actions):
+            return actions.at[i, :].set(new_env_states.past_actions[idx, :])
+
+        def do_nothing(actions):
+            return actions
+
+        return jax.lax.cond(should_update, do_update, do_nothing, best_actions)
+
+    new_best_actions = jax.lax.fori_loop(0, max_index.shape[0], update_loop, new_best_actions)
+
+
+    
+
     return GameStats(
         num_games=new_num_games,
         avg_return=new_avg_return,
         best_return=new_best_return,
+        best_actions=new_best_actions,  # keep typo here for compatibility
     )
 
   def _update_demonstrations_and_states(
@@ -510,19 +565,23 @@ class Agent:
 
     # output debug information
     # debug.print("Step {}: is_terminal = {}", global_step, is_terminal)
-    debug.print("Step {}: actions = {}", global_step, actions)
-    jax.lax.fori_loop(
-        0,
-        is_terminal.shape[0],
-        lambda j, _: jax.lax.cond(
-            is_terminal[j],
-            lambda _: debug.print("Step {}: is_terminal index {}", global_step, j),
-            lambda _: None,
-            operand=None
-        ),
-        init_val=None
-    )
-    debug.print("Step {}: init_tensor_index = {}", global_step, new_env_states.init_tensor_index)
+    # debug.print("Step {}: actions = {}", global_step, actions)
+    # jax.lax.fori_loop(
+    #     0,
+    #     is_terminal.shape[0],
+    #     lambda j, _: jax.lax.cond(
+    #         is_terminal[j],
+    #         lambda _: debug.print("Step {}: is_terminal index {}", global_step, j),
+    #         lambda _: None,
+    #         operand=None
+    #     ),
+    #     init_val=None
+    # )
+    # debug.print("Step {}: init_tensor_index = {}", global_step, new_env_states.init_tensor_index)
+    # for i in range(new_env_states.past_actions.shape[0]):
+    #     debug.print("Step {}: past_actions[{}] = {}", global_step, i, new_env_states.past_actions[i])
+
+
     # debug.print("Step {}: change_of_basis = {}", global_step, new_env_states.change_of_basis)
 
     # Update game statistics.
@@ -545,13 +604,14 @@ class Agent:
     )
 
 
-    debug.print("Step {}:", global_step)
+    # debug.print("Step {}:", global_step)
     config = demo_config.get_demo_config(
         use_gadgets=False  # Set to `False` for an experiment without gadgets.
     )
-    for t, target_circuit in enumerate(config.env_config.target_circuit_types):
-        tcount = jnp.array(-new_game_stats.best_return[t], dtype=int) # negative reward is T-count
-        debug.print('  Best T-count for {}: {}', t, tcount)
+    # for t, target_circuit in enumerate(config.env_config.target_circuit_types):
+    #     tcount = jnp.array(-new_game_stats.best_return[t], dtype=int) # negative reward is T-count
+    #     debug.print('  Best T-count for {}: {}', t, tcount)
+    #     debug.print('  Best actions for {}: {}', t, new_game_stats.best_actions[t, :])
 
     
 
