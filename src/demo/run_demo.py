@@ -125,6 +125,22 @@ def main(_):
               factor = action_index_to_factor(action, all_tensor_sizes[t])
               factors_list.append(factor)
       print(f'  Best factors for {target_circuit.name.lower()}: {factors_list}')
+
+      if step + exp_config.eval_frequency_steps >= exp_config.num_training_steps:
+        output_dir = "alphatensor_quantum/qsyn/outputs/after_ATQ"
+        os.makedirs(output_dir, exist_ok=True)
+        filename = os.path.join(output_dir, f"{target_circuit.name.lower()}.txt")
+
+        with open(filename, "w") as f:
+          f.write("[\n")
+          for i, factor in enumerate(factors_list):
+              f.write(f"  {factor.tolist()}")
+              if i != len(factors_list) - 1:
+                  f.write(",\n")
+              else:
+                  f.write("\n")
+          f.write("]\n")
+
     
 
 

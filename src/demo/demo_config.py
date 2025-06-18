@@ -100,8 +100,8 @@ def get_demo_config(use_gadgets: bool) -> DemoConfig:
   exp_config = ExperimentParams(
       batch_size=128,
       num_mcts_simulations=80,
-      # num_training_steps=50_000,
-      num_training_steps=150,
+      num_training_steps=50_000,
+      # num_training_steps=100,
       eval_frequency_steps=50,
       loss=LossParams(
           init_demonstrations_weight=1.0,
