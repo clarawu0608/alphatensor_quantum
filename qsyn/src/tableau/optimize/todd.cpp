@@ -444,13 +444,15 @@ std::pair<StabilizerTableau, Polynomial> ToddPhasePolynomialOptimizationStrategy
         spdlog::debug("num_terms after TODD: {}", ret_polynomial.size());
     }
 
+    //QDA annotation start
     {
         // Step 1: Find the first available filename polynomial-before-todd-N.txt
-        std::string filename;
+        std::string filename, check_filename;
         int index = 1;
         do {
+            check_filename = fmt::format("./outputs/polynomial-after-todd-{}-read.txt", index);
             filename = fmt::format("./outputs/polynomial-after-todd-{}.txt", index++);
-        } while (std::filesystem::exists(filename));
+        } while (std::filesystem::exists(check_filename));
 
         std::ofstream file(filename, std::ios::trunc);
         if (!file.is_open()) {
@@ -479,7 +481,7 @@ std::pair<StabilizerTableau, Polynomial> ToddPhasePolynomialOptimizationStrategy
             file << "]\n";
         }
     }
-    
+    //QDA annotation end
     {
         namespace fs = std::filesystem;
             std::string read_filename;

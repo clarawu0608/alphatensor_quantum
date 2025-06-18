@@ -22,7 +22,7 @@ h q[2];
 cp(pi/2) q[3], q[2];
 
 // Qubit 3
-h q[3];
+h q[3];！
 
 // --- Step 2: Swap to reverse qubit order
 swap q[0], q[3];
