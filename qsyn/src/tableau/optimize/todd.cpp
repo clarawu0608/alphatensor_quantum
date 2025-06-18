@@ -445,42 +445,42 @@ std::pair<StabilizerTableau, Polynomial> ToddPhasePolynomialOptimizationStrategy
     }
 
     //QDA annotation start
-    {
-        // Step 1: Find the first available filename polynomial-before-todd-N.txt
-        std::string filename, check_filename;
-        int index = 1;
-        do {
-            check_filename = fmt::format("./outputs/polynomial-after-todd-{}-read.txt", index);
-            filename = fmt::format("./outputs/polynomial-after-todd-{}.txt", index++);
-        } while (std::filesystem::exists(check_filename));
+    // {
+    //     // Step 1: Find the first available filename polynomial-before-todd-N.txt
+    //     std::string filename, check_filename;
+    //     int index = 1;
+    //     do {
+    //         check_filename = fmt::format("./outputs/polynomial-after-todd-{}-read.txt", index);
+    //         filename = fmt::format("./outputs/polynomial-after-todd-{}.txt", index++);
+    //     } while (std::filesystem::exists(check_filename));
 
-        std::ofstream file(filename, std::ios::trunc);
-        if (!file.is_open()) {
-            spdlog::error("Failed to open {} for writing.", filename);
-        } else {
-            spdlog::info("Writing phase polynomial to: {}", filename);
-            file << "[\n";
-            for (size_t idx = 0; idx < ret_polynomial.size(); ++idx) {
-                auto const& rotation = ret_polynomial[idx];
-                auto const& pauli_str = fmt::format("{}", rotation);  // e.g., exp(i * π/4 * ZIZ)
+    //     std::ofstream file(filename, std::ios::trunc);
+    //     if (!file.is_open()) {
+    //         spdlog::error("Failed to open {} for writing.", filename);
+    //     } else {
+    //         spdlog::info("Writing phase polynomial to: {}", filename);
+    //         file << "[\n";
+    //         for (size_t idx = 0; idx < ret_polynomial.size(); ++idx) {
+    //             auto const& rotation = ret_polynomial[idx];
+    //             auto const& pauli_str = fmt::format("{}", rotation);  // e.g., exp(i * π/4 * ZIZ)
 
-                std::string bit_array = "[";
-                for (char c : pauli_str | std::views::reverse) {
-                    if (c == 'Z') bit_array += "1, ";
-                    else if (c == 'I') bit_array += "0, ";
-                }
+    //             std::string bit_array = "[";
+    //             for (char c : pauli_str | std::views::reverse) {
+    //                 if (c == 'Z') bit_array += "1, ";
+    //                 else if (c == 'I') bit_array += "0, ";
+    //             }
 
-                // Remove trailing comma and space
-                if (bit_array.size() > 1) bit_array.pop_back(), bit_array.pop_back();
-                bit_array += "]";
+    //             // Remove trailing comma and space
+    //             if (bit_array.size() > 1) bit_array.pop_back(), bit_array.pop_back();
+    //             bit_array += "]";
 
-                file << "  " << bit_array;
-                if (idx + 1 != ret_polynomial.size()) file << ",";
-                file << "\n";
-            }
-            file << "]\n";
-        }
-    }
+    //             file << "  " << bit_array;
+    //             if (idx + 1 != ret_polynomial.size()) file << ",";
+    //             file << "\n";
+    //         }
+    //         file << "]\n";
+    //     }
+    // }
     //QDA annotation end
     {
         namespace fs = std::filesystem;
@@ -488,13 +488,16 @@ std::pair<StabilizerTableau, Polynomial> ToddPhasePolynomialOptimizationStrategy
         std::string renamed_filename;
         int index = 1;
 
+        std::string circuit = "_sig_grover4";
+        std::string format_base = "./outputs/after_ATQ/" + circuit;
+
         // Step 1: Find the first available -todd-N.txt file
         while (true) {
-            read_filename = fmt::format("./outputs/polynomial-after-todd-{}.txt", index);
-            if (fs::exists(read_filename)) {
-                renamed_filename = fmt::format("./outputs/polynomial-after-todd-{}-read.txt", index);
-                break;
-            }
+            read_filename = fmt::format("{}_{}.txt", format_base, index);
+            // if (fs::exists(read_filename)) {
+                // renamed_filename = fmt::format("{}_{}-read.txt", format_base, index);
+                // break;
+            // }
             ++index;
 
             // Optional safety cap
