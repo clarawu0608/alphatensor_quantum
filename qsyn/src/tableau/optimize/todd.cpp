@@ -367,6 +367,9 @@ std::pair<StabilizerTableau, Polynomial> ToddPhasePolynomialOptimizationStrategy
     
     spdlog::debug("JUST STARTED TODD OPTIMIZATION");
 
+    for (auto const& r : polynomial)
+        spdlog::debug("[BEFORE] {}", r);
+
     if (polynomial.empty()) {
         fmt::println("Polynomial is empty, returning the input Clifford and polynomial");
         return {clifford, polynomial};
@@ -439,6 +442,42 @@ std::pair<StabilizerTableau, Polynomial> ToddPhasePolynomialOptimizationStrategy
         }
         spdlog::trace("Polynomial after TODD:\n{}", fmt::join(ret_polynomial, "\n"));
         spdlog::debug("num_terms after TODD: {}", ret_polynomial.size());
+    }
+
+    {
+        // Step 1: Find the first available filename polynomial-before-todd-N.txt
+        std::string filename;
+        int index = 1;
+        do {
+            filename = fmt::format("./outputs/polynomial-after-todd-{}.txt", index++);
+        } while (std::filesystem::exists(filename));
+
+        std::ofstream file(filename, std::ios::trunc);
+        if (!file.is_open()) {
+            spdlog::error("Failed to open {} for writing.", filename);
+        } else {
+            spdlog::info("Writing phase polynomial to: {}", filename);
+            file << "[\n";
+            for (size_t idx = 0; idx < ret_polynomial.size(); ++idx) {
+                auto const& rotation = ret_polynomial[idx];
+                auto const& pauli_str = fmt::format("{}", rotation);  // e.g., exp(i * π/4 * ZIZ)
+
+                std::string bit_array = "[";
+                for (char c : pauli_str | std::views::reverse) {
+                    if (c == 'Z') bit_array += "1, ";
+                    else if (c == 'I') bit_array += "0, ";
+                }
+
+                // Remove trailing comma and space
+                if (bit_array.size() > 1) bit_array.pop_back(), bit_array.pop_back();
+                bit_array += "]";
+
+                file << "  " << bit_array;
+                if (idx + 1 != ret_polynomial.size()) file << ",";
+                file << "\n";
+            }
+            file << "]\n";
+        }
     }
     
     {
