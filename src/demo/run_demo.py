@@ -57,7 +57,7 @@ from alphatensor_quantum.src import tensors
 def main(_):
   # Set up the hyperparameters for the demo.
   config = demo_config.get_demo_config(
-      use_gadgets=False  # Set to `False` for an experiment without gadgets.
+      use_gadgets=True  # Set to `False` for an experiment without gadgets.
   )
   exp_config = config.exp_config
 

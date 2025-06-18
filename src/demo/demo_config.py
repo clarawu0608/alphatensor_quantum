@@ -80,11 +80,12 @@ def get_demo_config(use_gadgets: bool) -> DemoConfig:
     The hyperparameters for the demo.
   """
   if use_gadgets:
-    target_circuit_types = [
-        # A tensor of size 5. The optimal decomposition has a single Toffoli
-        # gadget, i.e., its equivalent T-count is 2.
-        tensors.CircuitType.MOD_5_4,
-    ]
+    # target_circuit_types = [
+    #     # A tensor of size 5. The optimal decomposition has a single Toffoli
+    #     # gadget, i.e., its equivalent T-count is 2.
+    #     tensors.CircuitType.MOD_5_4,
+    # ]
+    target_circuit_types = list(tensors.CircuitType)
   else:
     # target_circuit_types = [
     #     # A tensor of size 5 and rank 7.
@@ -100,7 +101,7 @@ def get_demo_config(use_gadgets: bool) -> DemoConfig:
   exp_config = ExperimentParams(
       batch_size=128,
       num_mcts_simulations=80,
-      num_training_steps=50_000,
+      num_training_steps=10_000,
       # num_training_steps=100,
       eval_frequency_steps=50,
       loss=LossParams(
