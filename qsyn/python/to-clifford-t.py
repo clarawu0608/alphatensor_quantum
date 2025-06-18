@@ -5,7 +5,7 @@ from qiskit.synthesis import generate_basic_approximations
 from qiskit.transpiler.passes import SolovayKitaev
 import qiskit.qasm2
 
-circuit_name = "qft4"
+circuit_name = "grover5"
 
 def qasm_to_clifford_and_t(qc, basic_approx_depth=3):
     qc = transpile(qc,basis_gates=["cx","u3"])
@@ -35,4 +35,13 @@ circuit.draw()
 new_qc = qasm_to_clifford_and_t(circuit)
 print(new_qc)
 new_qc.draw()
+
+t_count = sum(1 for instr, _, _ in new_qc.data if instr.name == "t")
+tdg_count = sum(1 for instr, _, _ in new_qc.data if instr.name == "tdg")
+total_t = t_count + tdg_count
+
+print(f"\nNumber of T gates: {t_count}")
+print(f"Number of T† gates: {tdg_count}")
+print(f"Total T-count (T + T†): {total_t}")
+
 qiskit.qasm2.dump(new_qc, f"./qsyn/my_circuits/{circuit_name}_clifford_t.qasm")
